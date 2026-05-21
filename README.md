@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/BAIGAOa/ink-trc/actions/workflows/ci.yml/badge.svg)](https://github.com/BAIGAOa/ink-trc/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/ink-trc.svg)](https://www.npmjs.com/package/ink-trc)
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
 
