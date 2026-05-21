@@ -1,4 +1,4 @@
-## ink-trc
+## ink-kit
 
 > Ready-to-use Ink components and tools for building terminal UI applications.
 
@@ -11,7 +11,7 @@
 ## Install
 
 ```bash
-npm install ink-trc
+npm install ink-kit
 ```
 
 ### Requirements
