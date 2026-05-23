@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Text } from 'ink';
 import chalk from 'chalk';
 import { useKeyboard, useFocusState } from '../../keyboard/index.js';
