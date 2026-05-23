@@ -47,7 +47,7 @@ export function SelectInput<T, I extends Item<T> = Item<T>>({
   itemComponent,
   indicatorComponent,
   focusId,
-  limit = 10,
+  limit: limitProp = 10,
 }: SelectInputProps<T, I>) {
   const isFocused = useFocusState(focusId);
   const { boundKeyboard, focusUnregister } = useKeyboard();
@@ -56,8 +56,8 @@ export function SelectInput<T, I extends Item<T> = Item<T>>({
   const ItemComp = (itemComponent ??
     (defaultItem as unknown as React.ComponentType<I & { isSelected: boolean }>));
 
-  const hasLimit = items.length > limit;
-  const limit = hasLimit ? limit : items.length;
+  const hasLimit = items.length > limitProp;
+  const limit = hasLimit ? limitProp : items.length;
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
