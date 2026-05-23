@@ -154,7 +154,7 @@ export function SelectInput<T, I extends Item<T> = Item<T>>({
       const isItemSelected = index === selectedIndex && isFocused;
       return React.createElement(
         Box,
-        { key: (item as Item<T>).Key ?? String(item.value) },
+        { key: item.Key ?? String(item.value) },
         React.createElement(IndicatorComp, { isSelected: isItemSelected }),
         React.createElement(ItemComp, { ...item, isSelected: isItemSelected } as any),
       );
