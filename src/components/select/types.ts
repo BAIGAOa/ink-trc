@@ -46,5 +46,5 @@ export interface SelectInputProps<T, I extends Item<T> = Item<T>> {
   * When the number of items exceeds what?
   * The list will be scrolled
   */
-  limit: number;
+  limit?: number;
 }
