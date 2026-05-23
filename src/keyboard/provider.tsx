@@ -543,7 +543,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const value = useMemo(
     () => ({
       boundKeyboard,
-      blockedKey: penetration,
+      penetration,
       stop,
       globalKeys,
       focusSet,
