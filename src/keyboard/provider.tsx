@@ -210,7 +210,6 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         );
       }
       const owner = _currentOverlayComponent || path[path.length - 1];
-      console.log('[boundKeyboard] owner:', owner?.displayName || owner?.name, '| overlay:', !!_currentOverlayComponent, '| keys:', keys);
       const layer = getLayer(owner);
 
 
