@@ -42,9 +42,11 @@ No more global `useInput` cluttered with `if-else` chains. ink-kit's keyboard sy
 
 #### Finer-grained partitioning
 
-There is also competition between levels, so we also have a **focus system**
-Each level has a focus layer, and only the activated focus is eligible to perform its own operation
-**See the API documentation for details.**
+Within the same level, identical keys are also in competition. To address this, we have a complete **focus system**.  
+Each level maintains a set of focus targets, and only one focus is active at any given time within a level. Each focus target has its own bound keyboard operations. Only the activated focus target is eligible to execute them during event dispatching in **useInput**.  
+
+**For more details, please refer to the API documentation.**
+ 
 
 ### Module-Level Functions
 
