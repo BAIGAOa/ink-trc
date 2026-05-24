@@ -31,11 +31,11 @@ export interface SelectInputProps<T, I extends Item<T> = Item<T>> {
   /**
    * UI components for custom rendering
    */
-  itemComponent: React.ComponentType<I & { isSelected: boolean }>;
+  itemComponent?: React.ComponentType<I & { isSelected: boolean }>;
   /**
    * Custom Indicator UI Component
    */
-  indicatorComponent: React.ComponentType<{ isSelected: boolean }>;
+  indicatorComponent?: React.ComponentType<{ isSelected: boolean }>;
   /**
    * Focus, string type, controls whether this component is active
    * Effectively prevents two SelectInputs from competing with each other
