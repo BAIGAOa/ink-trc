@@ -158,7 +158,7 @@ function MainMenu() {
       <Text>{' '}</Text>
 
       {/* The main menu itself is a SelectInput — focusId anchors it on this screen */}
-      {/* @ts-expect-error – generic inference quirk; runtime behaviour is correct */}
+  
       <SelectInput<string>
         items={menuItems}
         onSelect={handleMenuSelect}
@@ -220,7 +220,7 @@ function SettingsDemo() {
       <Text bold underline>
         Theme
       </Text>
-      {/* @ts-expect-error – generic inference quirk */}
+      
       <SelectInput<string>
         items={themeItems}
         onSelect={(item) => setTheme(item.value)}
@@ -234,7 +234,7 @@ function SettingsDemo() {
       <Text bold underline>
         Difficulty
       </Text>
-      {/* @ts-expect-error – generic inference quirk */}
+      
       <SelectInput<string>
         items={difficultyItems}
         onSelect={(item) => setDifficulty(item.value)}
