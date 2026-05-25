@@ -15,13 +15,25 @@ import {
   GlobalKeyEntry,
   BlockedKeyOptions,
   StopOptions,
+  ShortcutOperationEntry,
 } from './types.js';
 import { useScreenSystem } from '../screen/hook.js';
 
 let _currentPath: React.ComponentType<any>[] = [];
 let _currentOverlayComponent: React.ComponentType<any> | null = null;
-let _globalKeys: GlobalKeyEntry[] = [];
+let _globalKeys: {
+  key: string | string[];
+  operate: () => void;
+  cover?: boolean;
+  affectOverlay?: boolean;
+  category?: React.ComponentType<any>[] | "*";
+}[] = [];
 let _focusSubscribers = new Set<() => void>();
+
+// 存储快捷操作的集合
+// 在某些场景下为了防止多次重复定义某个操作
+// 以及为了可以JSON配置化，我们就需要这个东西
+let _shortcutOperations = new Map<string, () => void>()
 
 
 /**
@@ -85,39 +97,39 @@ function normalizeKeyNames(input: string, key: Key): string[] {
 * TODO: Finish the implementation of TextInput as soon as possible
 */
 function isNormalCharacter(input: string, key: Key): boolean {
-    // 必须有实际字符内容
-    if (!input) return false;
+  // 必须有实际字符内容
+  if (!input) return false;
 
-    //排除所有特殊键（type guard：这些键对应的 Key 属性为 true 时，一律不是普通字符）
-    if (key.upArrow) return false;
-    if (key.downArrow) return false;
-    if (key.leftArrow) return false;
-    if (key.rightArrow) return false;
+  //排除所有特殊键（type guard：这些键对应的 Key 属性为 true 时，一律不是普通字符）
+  if (key.upArrow) return false;
+  if (key.downArrow) return false;
+  if (key.leftArrow) return false;
+  if (key.rightArrow) return false;
 
-    if (key.pageDown) return false;
-    if (key.pageUp) return false;
+  if (key.pageDown) return false;
+  if (key.pageUp) return false;
 
-    if (key.home) return false;
-    if (key.end) return false;
+  if (key.home) return false;
+  if (key.end) return false;
 
-    if (key.return) return false;
-    if (key.escape) return false;
-    if (key.tab) return false;
-    if (key.backspace) return false;
-    if (key.delete) return false;
+  if (key.return) return false;
+  if (key.escape) return false;
+  if (key.tab) return false;
+  if (key.backspace) return false;
+  if (key.delete) return false;
 
-    // 排除各类修饰键组合（Ctrl/Meta/Super/Hyper）
-    // 根据 Ink 中的Key类型定义源码，Ctrl+字母等组合应走具体键名匹配，不触发通配符
-    if (key.ctrl) return false;
-    if (key.meta) return false;
-    if (key.super) return false;
-    if (key.hyper) return false;
+  // 排除各类修饰键组合（Ctrl/Meta/Super/Hyper）
+  // 根据 Ink 中的Key类型定义源码，Ctrl+字母等组合应走具体键名匹配，不触发通配符
+  if (key.ctrl) return false;
+  if (key.meta) return false;
+  if (key.super) return false;
+  if (key.hyper) return false;
 
-    // eventType === 'release' 时忽略（防止重复触发）
-    if (key.eventType === 'release') return false;
+  // eventType === 'release' 时忽略（防止重复触发）
+  if (key.eventType === 'release') return false;
 
-    // 若以上检查全部通过，我们就可以立刻认定这是一个通配符"*"
-    return true;
+  // 若以上检查全部通过，我们就可以立刻认定这是一个通配符"*"
+  return true;
 }
 
 
@@ -207,7 +219,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   // Fix: 添加覆盖层的清理逻辑
   useEffect(() => {
     if (prevOverlayRef.current && !currentOverlay) {
-      layersRef.current.delete(prevOverlayRef.current); 
+      layersRef.current.delete(prevOverlayRef.current);
     }
     prevOverlayRef.current = currentOverlay
       ? (currentOverlay as React.ReactElement).type as React.ComponentType<any>
@@ -243,7 +255,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   const boundKeyboard = useCallback(
     (
       keys: string[],
-      handler: KeyHandler,
+      handler: KeyHandler | string,
       options?: BoundKeyboardOptions,
     ): (() => void) => {
       const path = _currentPath;
@@ -301,12 +313,28 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
         }
 
-        const entry: BoundKeyEntry = {
-          keys,
-          handler,
-          onlyThis: options?.onlyThis ?? false,
-          owner,
-        };
+        let entry: BoundKeyEntry
+
+        if (typeof handler === 'string') {
+          const action = _shortcutOperations.get(handler)
+          if (!action) {
+            throw new Error(`[Ink-Router-Kit]The shortcut key you used does not exist with ID ${handler}`)
+          }
+          entry = {
+            keys,
+            handler: action,
+            onlyThis: options?.onlyThis ?? false,
+            owner
+          }
+        } else {
+          entry = {
+            keys,
+            handler,
+            onlyThis: options?.onlyThis ?? false,
+            owner
+          }
+        }
+
         target.bindings.push(entry);
 
         return () => {
@@ -357,12 +385,27 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
       }
 
-      const entry: BoundKeyEntry = {
-        keys,
-        handler,
-        onlyThis: options?.onlyThis ?? false,
-        owner,
-      };
+      let entry: BoundKeyEntry
+
+      if (typeof handler === 'string') {
+        const action = _shortcutOperations.get(handler)
+        if (!action) {
+          throw new Error(`[Ink-Router-Kit]The shortcut key you used does not exist with ID ${handler}`)
+        }
+        entry = {
+          keys,
+          handler: action,
+          onlyThis: options?.onlyThis ?? false,
+          owner
+        }
+      } else {
+        entry = {
+          keys,
+          handler,
+          onlyThis: options?.onlyThis ?? false,
+          owner
+        }
+      }
 
       layer.bindings.push(entry);
 
@@ -578,10 +621,45 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
    */
   const globalKeys = useCallback(
     (entries: GlobalKeyEntry[]) => {
-      _globalKeys = entries;
+      // 根据预期特性，每一次调用都应该重置全局键集合
+      // 后续都是这样，所以每次调用都相当于直接替换
+      _globalKeys = []
+      for (const each of entries) {
+        if (typeof each.operate === 'string') {
+          const action = _shortcutOperations.get(each.operate)
+          if(!action){
+            throw new Error(`[Ink-Kit-Router]You want to call the shortcut ${each.operate} in the global key, but it is not registered`)
+          }
+          _globalKeys.push({
+            key: each.key,
+            operate: action,
+            cover: each.cover,
+            category: each.category,
+            affectOverlay: each.affectOverlay
+          })
+        } else {
+          _globalKeys.push({
+            key: each.key,
+            operate: each.operate,
+            cover: each.cover,
+            category: each.category,
+            affectOverlay: each.affectOverlay 
+          })
+        }
+    
+      }
     },
     [],
   );
+
+  const defineShortcutAction = useCallback((entries: ShortcutOperationEntry[]) => {
+    for (const each of entries) {
+      if (_shortcutOperations.has(each.actionId)) {
+        throw new Error(`[Ink-Router-Kit]Duplicate shortcut cannot be defined with ID ${each.actionId}`)
+      }
+      _shortcutOperations.set(each.actionId, each.action)
+    }
+  }, [])
 
   const value = useMemo(
     () => ({
@@ -595,6 +673,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       focusCurrent,
       focusUnregister,
       subscribeFocus,
+      defineShortcutAction
     }),
     [
       boundKeyboard,
@@ -607,6 +686,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       focusCurrent,
       focusUnregister,
       subscribeFocus,
+      defineShortcutAction
     ],
   );
 
@@ -672,7 +752,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
                 return;
               }
             }
-            
+
             if (eventNames.some((n) => ft.stoppedKeys.includes(n))) {
               return;
             }
@@ -688,10 +768,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
             }
           }
 
-          const wildcardBinding = overlayLayer.bindings.find(b => b.keys.includes('*')); 
-          if (wildcardBinding && isNormalCharacter(input, key)) { 
-            wildcardBinding.handler(input, key); 
-            return; 
+          const wildcardBinding = overlayLayer.bindings.find(b => b.keys.includes('*'));
+          if (wildcardBinding && isNormalCharacter(input, key)) {
+            wildcardBinding.handler(input, key);
+            return;
           }
         }
 
@@ -789,12 +869,12 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
           }
         }
 
-        const wildcardBinding = layer.bindings.find(b => b.keys.includes('*')); 
-        if (wildcardBinding && isNormalCharacter(input, key)) { 
-          if (!(wildcardBinding.onlyThis && (i !== path.length - 1 || overlayComp !== null))) { 
-            wildcardBinding.handler(input, key); 
-            return; 
-          } 
+        const wildcardBinding = layer.bindings.find(b => b.keys.includes('*'));
+        if (wildcardBinding && isNormalCharacter(input, key)) {
+          if (!(wildcardBinding.onlyThis && (i !== path.length - 1 || overlayComp !== null))) {
+            wildcardBinding.handler(input, key);
+            return;
+          }
         }
       }
 

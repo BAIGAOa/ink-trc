@@ -113,8 +113,10 @@ export interface GlobalKeyEntry {
    */
   key: string | string[];
 
-  /** Callback to invoke when the key is pressed. */
-  operate: () => void;
+  /** Callback to invoke when the key is pressed.
+   * It can also be a string, which is used to directly invoke an operation
+   */
+  operate: (() => void) | string;
 
   /**
    * Whether screen components are allowed to override this global key
@@ -142,4 +144,19 @@ export interface GlobalKeyEntry {
    * - `[Menu, Game]`: only when the stack top is exactly Menu or Game
    */
   category?: React.ComponentType<any>[] | "*";
+}
+
+/**
+ * Type definition for shortcut
+ */
+export interface ShortcutOperationEntry {
+  /**
+   * Unique identification of the shortcut
+   * Used to get an operation and so on.
+   */
+  actionId: string;
+  /**
+   * What does calling a shortcut trigger
+   */
+  action: () => void;
 }

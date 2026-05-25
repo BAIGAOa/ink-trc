@@ -5,6 +5,7 @@ import type {
   BlockedKeyOptions,
   StopOptions,
   GlobalKeyEntry,
+  ShortcutOperationEntry,
 } from "./types.js";
 
 /**
@@ -126,6 +127,8 @@ export interface KeyboardContextValue {
    * @returns         An unsubscribe function.
    */
   subscribeFocus: (listener: () => void) => () => void;
+
+  defineShortcutAction: (entries: ShortcutOperationEntry[]) => void;
 }
 
 /**

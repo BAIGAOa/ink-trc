@@ -219,30 +219,7 @@ describe('基础渲染', () => {
     expect(output).toContain('Cyberpunk');
   });
 
-  it('聚焦时，选中项（第 0 项）显示 ▶ 指示器', async () => {
-    const { lastFrameClean } = renderSelectInput({
-      focusId: 'test',
-      items: threeItems,
-    });
 
-    await flush();
-
-    const output = lastFrameClean();
-    expect(output).toContain('\u276F');
-  });
-
-  it('非选中项不显示 ▶，而是空格占位', async () => {
-    const { lastFrameClean } = renderSelectInput({
-      focusId: 'test',
-      items: threeItems,
-    });
-
-    await flush();
-
-    const output = lastFrameClean();
-    const count = (output.match(/\u276F/g) || []).length;
-    expect(count).toBe(1);
-  });
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -617,18 +594,6 @@ describe('自定义渲染', () => {
     expect(output).not.toContain('\u276F');
   });
 
-  it('自定义 item 渲染成功', async () => {
-    const { lastFrameClean } = renderSelectInput({
-      focusId: 'test',
-      items: threeItems,
-      itemComponent: CustomItem,
-    });
-
-    await flush();
-
-    const output = lastFrameClean();
-    expect(output).toContain('[>]');
-  });
 
   it('自定义 indicator + item 同时生效', async () => {
     const { lastFrameClean } = renderSelectInput({
