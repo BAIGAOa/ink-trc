@@ -1,4 +1,3 @@
-
 # Keyboard System
 
 ink-kit provides a **layered keyboard event system** built on top of the screen management tree. Instead of a single global `useInput` with messy `if-else` chains, you get **per-screen-layer** key bindings with transparent keys, propagation barriers, global shortcuts, and **within-screen focus management**.
@@ -21,11 +20,18 @@ import {
 
 function Menu() {
   const { skip } = useScreenSystem();
-  const { boundKeyboard } = useKeyboard();
+  const { boundKeyboard, defineShortcutAction } = useKeyboard();
 
   useEffect(() => {
-    boundKeyboard(['s'], () => skip(Game, { level: 1 }));
-    boundKeyboard(['q'], () => process.exit());
+    // Register named shortcut operations
+    defineShortcutAction([
+      { actionId: 'start-game', action: () => skip(Game, { level: 1 }) },
+      { actionId: 'quit', action: () => process.exit() },
+    ]);
+
+    // Bind keys to shortcut IDs instead of inline functions
+    boundKeyboard(['s'], 'start-game');
+    boundKeyboard(['q'], 'quit');
   }, []);
 
   return (
@@ -132,6 +138,23 @@ Events always check the active focus target **first**, then fall through to scre
 
 Multiple form controls on the same screen can each own a focus target. The built-in **Tab** key rotates between them automatically.
 
+### Shortcut Actions
+
+Shortcut actions decouple **operation definition** from **key binding**. Instead of passing inline functions to `boundKeyboard`, you register named operations with `defineShortcutAction` and reference them by string ID:
+
+```tsx
+// Define the operation once
+defineShortcutAction([
+  { actionId: 'submit', action: () => console.log('submitted') },
+]);
+
+// Bind it anywhere
+boundKeyboard(['return'], 'submit');
+boundKeyboard(['ctrl+s'], 'submit', { focusId: 'editor' });
+```
+
+This makes it possible to reconfigure keys (via JSON) without touching code.
+
 ---
 
 ## API Reference
@@ -164,12 +187,46 @@ const {
   focusCurrent,
   focusUnregister,
   subscribeFocus,
+  defineShortcutAction,
 } = useKeyboard();
 ```
 
 React hook returning the keyboard API.
 
 Must be used inside `<KeyboardProvider>`, otherwise throws an error.
+
+---
+
+### `defineShortcutAction`
+
+```tsx
+defineShortcutAction(entries: ShortcutOperationEntry[]): void;
+```
+
+Register named shortcut actions that can be referenced by `boundKeyboard` and `globalKeys` using a string identifier instead of an inline callback. Decouples operation definition from key binding.
+
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| entries   | `ShortcutOperationEntry[]` | Array of `{ actionId: string, action: () => void }` |
+
+```tsx
+defineShortcutAction([
+  { actionId: 'start-game', action: () => skip(Game, {}) },
+  { actionId: 'quit', action: () => process.exit() },
+  { actionId: 'save', action: () => saveGame() },
+]);
+```
+
+Shortcut actions can be referenced anywhere string handlers are accepted:
+
+```tsx
+// In boundKeyboard
+boundKeyboard(['s'], 'start-game');
+boundKeyboard(['ctrl+s'], 'save', { focusId: 'editor' });
+
+// In globalKeys
+globalKeys([{ key: 'q', operate: 'quit' }]);
+```
 
 ---
 
@@ -193,13 +250,28 @@ boundKeyboard(keys, handler, options?): () => void;
 
 Bind one or more keys to a handler. The binding is automatically associated with the top-of-stack component.
 
-| Parameter | Type                            | Description                                      |
-| --------- | ------------------------------- | ------------------------------------------------ |
-| keys      | `string[]`                      | Key names to bind (e.g. `['s']`, `['ctrl+q', 'return']`) |
-| handler   | `(input: string, key: Key) => void` | Callback matching Ink's `useInput` signature  |
-| options   | `{ onlyThis?: boolean; focusId?: string }` | Optional behavior flags               |
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| keys      | `string[]` | Key names to bind (e.g. `['s']`, `['ctrl+q', 'return']`) |
+| handler   | `(input: string, key: Key) => void` | Callback or shortcut action ID string |
+| options   | `{ onlyThis?: boolean; focusId?: string }` | Optional behavior flags |
 
 Returns an unbind function.
+
+The `handler` parameter accepts two forms:
+1. **Function** — an inline callback, same as before
+2. **String** — an action ID previously registered via `defineShortcutAction`
+
+```tsx
+// Inline function
+boundKeyboard(['s'], () => skip(Game, {}));
+
+// Shortcut action reference
+boundKeyboard(['s'], 'start-game');
+
+// With focus target
+boundKeyboard(['ctrl+s'], 'save', { focusId: 'editor' });
+```
 
 **Key name format:**
 
@@ -239,9 +311,9 @@ blockedKey(keys, options?): void;
 
 Mark one or more keys as **transparent** on the current layer. When a transparent key reaches this layer, the layer's own bindings are skipped and the key propagates to layers below.
 
-| Parameter | Type                 | Description                              |
-| --------- | -------------------- | ---------------------------------------- |
-| keys      | `string[]`           | Key names to make transparent            |
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| keys      | `string[]` | Key names to make transparent |
 | options   | `{ focusId?: string }` | If provided, blocks only within that focus target |
 
 Does not return an unbind function. Transparency is automatically cleaned up when the layer is destroyed.
@@ -256,9 +328,9 @@ stop(keys, options?): () => void;
 
 Prevent one or more keys from propagating to layers below. The stopped keys are consumed at this layer: the layer's own bindings are evaluated first, and if no binding matches, the key is blocked.
 
-| Parameter | Type                 | Description                              |
-| --------- | -------------------- | ---------------------------------------- |
-| keys      | `string[]`           | Key names to stop                        |
+| Parameter | Type | Description |
+| --------- | ---- | ----------- |
+| keys      | `string[]` | Key names to stop |
 | options   | `{ focusId?: string }` | If provided, stops within that focus target |
 
 Returns an unstop function.
@@ -275,13 +347,22 @@ Register **global key bindings** that fire independently of the screen stack. Ca
 
 #### `GlobalKeyEntry`
 
-| Property      | Type                                      | Default        | Description |
-| ------------- | ----------------------------------------- | -------------- | ----------- |
-| `key`         | `string \| string[]`                      | —              | Key name(s) to match |
-| `operate`     | `() => void`                              | —              | Callback invoked when the key is pressed |
-| `cover`       | `boolean`                                 | `true`         | Whether screen components may override this key |
-| `affectOverlay` | `boolean`                               | `false`        | Fire before (`true`) or after (`false`) the overlay layer |
-| `category`    | `React.ComponentType[] \| '*' \| undefined` | `'*'`       | Whitelist of screens; `'*'` = all, `[]` = disabled |
+| Property        | Type                                      | Default        | Description |
+| --------------- | ----------------------------------------- | -------------- | ----------- |
+| `key`           | `string \| string[]`                      | —              | Key name(s) to match |
+| `operate`       | `() => void \| string`                    | —              | Callback or shortcut action ID string |
+| `cover`         | `boolean`                                 | `true`         | Whether screen components may override this key |
+| `affectOverlay` | `boolean`                                 | `false`        | Fire before (`true`) or after (`false`) the overlay layer |
+| `category`      | `React.ComponentType[] \| '*' \| undefined` | `'*'`       | Whitelist of screens; `'*'` = all, `[]` = disabled |
+
+The `operate` field supports shortcut action IDs:
+
+```tsx
+globalKeys([
+  { key: 'q', operate: 'quit' },
+  { key: 's', operate: 'start-game', affectOverlay: true },
+]);
+```
 
 ---
 
@@ -330,7 +411,87 @@ The same behavior applies to overlays with focus targets.
 
 ## Common Patterns
 
-### Focus-aware Component
+### Per-Screen Key Binding (Recommended)
+
+Use `useEffect` to set up bindings when the screen mounts and clean them up on unmount.
+
+```tsx
+function Game() {
+  const { back } = useScreenSystem();
+  const { boundKeyboard, stop } = useKeyboard();
+
+  useEffect(() => {
+    const unbindB = boundKeyboard(['b'], () => back());
+    const unstopQ = stop(['q']);
+    return () => {
+      unbindB();
+      unstopQ();
+    };
+  }, []);
+
+  return <Text>Playing...</Text>;
+}
+```
+
+### Using Shortcut Actions
+
+```tsx
+function Menu() {
+  const { skip } = useScreenSystem();
+  const { boundKeyboard, defineShortcutAction } = useKeyboard();
+
+  useEffect(() => {
+    defineShortcutAction([
+      { actionId: 'start-game', action: () => skip(Game, {}) },
+      { actionId: 'open-settings', action: () => skip(Settings, {}) },
+    ]);
+    boundKeyboard(['s'], 'start-game');
+    boundKeyboard(['c'], 'open-settings');
+  }, []);
+
+  return <Text>Main Menu</Text>;
+}
+```
+
+### Blocking Keys for Pass-Through
+
+Let a specific key "pierce" through the current layer to reach a lower layer.
+
+```tsx
+function Combat() {
+  const { boundKeyboard, blockedKey } = useKeyboard();
+
+  useEffect(() => {
+    blockedKey(['e']);
+    boundKeyboard(['a'], () => attack());
+  }, []);
+
+  return <Text>Combat! Press A to attack.</Text>;
+}
+```
+
+### Global Keys with Shortcut Actions
+
+```tsx
+function App() {
+  const { globalKeys, defineShortcutAction } = useKeyboard();
+
+  useEffect(() => {
+    defineShortcutAction([
+      { actionId: 'quit', action: () => process.exit() },
+      { actionId: 'help', action: () => showHelp() },
+    ]);
+    globalKeys([
+      { key: 'q', operate: 'quit', cover: false },
+      { key: 'h', operate: 'help', cover: true, affectOverlay: true, category: '*' },
+    ]);
+  }, []);
+
+  return <CurrentScreen />;
+}
+```
+
+### Focus-Aware Component
 
 ```tsx
 function MySelectInput<T>(props: { focusId: string; items: Item<T>[]; onSelect: (item: Item<T>) => void }) {
@@ -400,20 +561,14 @@ function Wizard() {
 }
 ```
 
-### Global Keys with Focus
-
-Global keys continue to work as before. Screen components can override them through either screen-level or focus-level bindings, as long as the global key has `cover: true`.
-
 ---
 
 ## Complete Event Chain
 
 ```
 Key pressed
-    │
-    ├─ ① Global keys (affectOverlay: true)
-    │      └─ matched → consume, stop
-    │
+    │ ├─ ① keys (affectlay: true)
+      └─ → consume, stop
     ├─ ② Active overlay layer
     │      ├─ Built-in Tab/Shift+Tab → switch focus within overlay
     │      ├─ Focus target (if active)
@@ -423,10 +578,9 @@ Key pressed
     │      ├─ Overlay layer bindings
     │      │    ├─ blockedKey → skip bindings
     │      │    ├─ boundKeyboard matched? → consume, stop
-    │      │    └─ stop keys matched? → consume, block
-    │      └─ (none matched) → continue
+    │      │ └─ stop keys matched? → consume, block │      └─ (none matched) → continue
     │
-    ├─ ③ Global keys (affectOverlay: false, default)
+ ③ Global keys (ectOverlay: false, default)
     │      └─ matched → consume, stop
     │
     ├─ ④ Screen stack (top → bottom)
@@ -447,131 +601,6 @@ Key pressed
 
 ---
 
-## Type Safety
-
-All keyboard APIs provide full TypeScript type inference.
-
-```tsx
-// Key names are plain strings (no enum needed)
-boundKeyboard(['ctrl+s'], handler);
-
-// GlobalKeyEntry is fully typed
-globalKeys([
-  {
-    key: 'e',
-    operate: () => console.log('global e'),
-    cover: true,
-    affectOverlay: false,
-    category: [Menu, Settings],
-  },
-]);
-
-// Focus-aware components have full type safety on focusId
-boundKeyboard(['up'], handleUp, { focusId: 'my-input' });
-```
-
----
-
-## Common Patterns
-
-### Per-Screen Key Binding (Recommended)
-
-Use `useEffect` to set up bindings when the screen mounts and clean them up on unmount.
-
-```tsx
-function Game() {
-  const { back } = useScreenSystem();
-  const { boundKeyboard, stop } = useKeyboard();
-
-  useEffect(() => {
-    const unbindB = boundKeyboard(['b'], () => back());
-    const unstopQ = stop(['q']);
-    return () => {
-      unbindB();
-      unstopQ();
-    };
-  }, []);
-
-  return <Text>Playing...</Text>;
-}
-```
-
-### Blocking Keys for Pass-Through
-
-Let a specific key "pierce" through the current layer to reach a lower layer.
-
-```tsx
-function Combat() {
-  const { boundKeyboard, blockedKey } = useKeyboard();
-
-  useEffect(() => {
-    blockedKey(['e']);
-    boundKeyboard(['a'], () => attack());
-  }, []);
-
-  return <Text>Combat! Press A to attack.</Text>;
-}
-```
-
-### Global Keys for Application-Wide Shortcuts
-
-```tsx
-function App() {
-  const { globalKeys } = useKeyboard();
-
-  useEffect(() => {
-    globalKeys([
-      {
-        key: 'q',
-        operate: () => process.exit(),
-        cover: false,
-      },
-      {
-        key: 'h',
-        operate: () => showHelp(),
-        cover: true,
-        affectOverlay: true,
-        category: '*',
-      },
-    ]);
-  }, []);
-
-  return <CurrentScreen />;
-}
-```
-
-### Override a Global Key in a Specific Screen
-
-```tsx
-globalKeys([{ key: 'e', operate: () => exitGame(), cover: true }]);
-
-function Settings() {
-  const { boundKeyboard } = useKeyboard();
-  useEffect(() => {
-    boundKeyboard(['e'], () => console.log('Settings: e pressed'));
-  }, []);
-}
-```
-
-### Focus-Based Override with Global Keys
-
-```tsx
-globalKeys([{ key: 'e', operate: () => console.log('global e'), cover: true }]);
-
-function SettingsForm() {
-  const { boundKeyboard } = useKeyboard();
-  useEffect(() => {
-    // Override global 'e' only when this specific input is focused
-    boundKeyboard(['e'], () => console.log('input: e'), {
-      focusId: 'name-input',
-    });
-  }, []);
-  // ...
-}
-```
-
----
-
 ## Common Errors
 
 | Error Message | Cause |
@@ -581,5 +610,5 @@ function SettingsForm() {
 | `[Ink-Trc] stop() 必须在屏幕组件内调用。` | `stop` was called outside a screen component |
 | `[Ink-Trc] blockedKey() 必须在屏幕组件内调用。` | `blockedKey` was called outside a screen component |
 | `[Ink-Trc] 组件 "X" 尝试通过 boundKeyboard 绑定 "Y"，但该键已被 globalKeys 声明且 cover: false，不允许覆盖。` | A screen or focus target tried to bind a key with `cover: false` |
-```
-
+| `[Ink-Router-Kit] The shortcut key you used does not exist with ID {id}` | `boundKeyboard` or `globalKeys` referenced a shortcut action ID that was not registered via `defineShortcutAction` |
+| `[Ink-Router-Kit] Duplicate shortcut cannot be defined with ID {id}` | A shortcut action ID was registered more than once |
