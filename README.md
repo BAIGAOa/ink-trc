@@ -19,7 +19,7 @@ npm install @baigao_h/ink-kit
 
 | Dependency | Minimum Version |
 | ---------- | --------------- |
-| Node.js    | 20              |
+| Node.js    | 22              |
 | ink        | 5               |
 | react      | 18              |
 
