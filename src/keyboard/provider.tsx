@@ -249,6 +249,24 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [],
   );
 
+  function createBoundKeyEntry(
+    keys: string[],
+    handler: KeyHandler | string,
+    onlyThis: boolean,
+    owner: React.ComponentType<any>,
+  ): BoundKeyEntry {
+    if (typeof handler === 'string') {
+      const action = _shortcutOperations.get(handler);
+      if (!action) {
+        throw new Error(
+          `[Ink-Router-Kit] The shortcut key you used does not exist with ID ${handler}`,
+        );
+      }
+      return { keys, handler: action, onlyThis, owner };
+    }
+    return { keys, handler, onlyThis, owner };
+  }
+
   const getOrCreateFocusTarget = useCallback(
     (layer: ScreenKeyboardLayer, focusId: string) => {
       let target = layer.focusTargets.get(focusId);
@@ -322,27 +340,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
         }
 
-        let entry: BoundKeyEntry
-
-        if (typeof handler === 'string') {
-          const action = _shortcutOperations.get(handler)
-          if (!action) {
-            throw new Error(`[Ink-Router-Kit]The shortcut key you used does not exist with ID ${handler}`)
-          }
-          entry = {
-            keys,
-            handler: action,
-            onlyThis: options?.onlyThis ?? false,
-            owner
-          }
-        } else {
-          entry = {
-            keys,
-            handler,
-            onlyThis: options?.onlyThis ?? false,
-            owner
-          }
-        }
+        const entry = createBoundKeyEntry(keys, handler, options?.onlyThis ?? false, owner);
 
         target.bindings.push(entry);
 
@@ -394,27 +392,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
       }
 
-      let entry: BoundKeyEntry
-
-      if (typeof handler === 'string') {
-        const action = _shortcutOperations.get(handler)
-        if (!action) {
-          throw new Error(`[Ink-Router-Kit]The shortcut key you used does not exist with ID ${handler}`)
-        }
-        entry = {
-          keys,
-          handler: action,
-          onlyThis: options?.onlyThis ?? false,
-          owner
-        }
-      } else {
-        entry = {
-          keys,
-          handler,
-          onlyThis: options?.onlyThis ?? false,
-          owner
-        }
-      }
+      const entry = createBoundKeyEntry(keys, handler, options?.onlyThis ?? false, owner);
 
       layer.bindings.push(entry);
 
