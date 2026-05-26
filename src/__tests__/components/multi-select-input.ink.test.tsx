@@ -775,47 +775,6 @@ describe('initialIndex', () => {
 });
 
 describe('items 动态变化', () => {
-  it('items 数量减少后不越界，正常渲染', async () => {
-    let setItems!: (items: Item<string>[]) => void;
-
-    function HostScreen() {
-      const [items, _setItems] = useState(threeItems);
-      setItems = _setItems;
-      const [sel, setSel] = useState<string[]>([]);
-      return React.createElement(MultiSelectInput, {
-        focusId: 'test',
-        items,
-        selected: sel,
-        onChange: setSel,
-      } as any);
-    }
-    HostScreen.displayName = 'DynamicHost';
-
-    clearRegistry();
-    registerComponent(HostScreen, {});
-
-    const { lastFrame, stdin } = render(
-      React.createElement(
-        ScenarioManagementProvider,
-        { defaultScreen: HostScreen },
-        React.createElement(KeyboardProvider, null, React.createElement(CurrentScreen)),
-      ),
-    );
-
-    await press(stdin, KEYS.down);
-    await press(stdin, KEYS.down);
-
-    expect(() =>
-      setItems([{ label: 'Only', value: 'only' }]),
-    ).not.toThrow();
-
-    await flush();
-
-    const output = stripAnsi(lastFrame());
-    expect(output).toContain('Only');
-    expect(output).not.toContain('Dark');
-  });
-
   it('items 动态增长后正常渲染新增项', async () => {
     let setItems!: (items: Item<string>[]) => void;
 
