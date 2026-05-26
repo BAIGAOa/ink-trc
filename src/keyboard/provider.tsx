@@ -249,6 +249,12 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [],
   );
 
+  function getCurrentOwner(): React.ComponentType<any> | null {
+    const path = _currentPath;
+    if (path.length === 0) return null;
+    return _currentOverlayComponent || path[path.length - 1];
+  }
+
   function createBoundKeyEntry(
     keys: string[],
     handler: KeyHandler | string,
@@ -347,13 +353,12 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       handler: KeyHandler | string,
       options?: BoundKeyboardOptions,
     ): (() => void) => {
-      const path = _currentPath;
-      if (path.length === 0) {
+      const owner = getCurrentOwner();
+      if (!owner) {
         throw new Error(
-          '[Ink-Router-Kit] bound Keyboard () must be called inside the screen component. There is currently no active screen.',
+          '[Ink-Router-Kit] boundKeyboard() must be called inside a screen component. There is currently no active screen.',
         );
       }
-      const owner = _currentOverlayComponent || path[path.length - 1];
       const layer = getLayer(owner);
 
 
@@ -400,11 +405,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
    */
   const penetration = useCallback(
     (keys: string[], options?: BlockedKeyOptions) => {
-      const path = _currentPath;
-      if (path.length === 0) {
+      const owner = getCurrentOwner();
+      if (!owner) {
         throw new Error('[Ink-Router-Kit] blockedKey() must be called inside a screen component.');
       }
-      const owner = _currentOverlayComponent || path[path.length - 1];
       const layer = getLayer(owner);
 
       if (options?.focusId) {
@@ -435,11 +439,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
    */
   const stop = useCallback(
     (keys: string[], options?: StopOptions): (() => void) => {
-      const path = _currentPath;
-      if (path.length === 0) {
-        throw new Error('[Ink-Trc] stop() must be called within a screen component.');
+      const owner = getCurrentOwner();
+      if (!owner) {
+        throw new Error('[Ink-Router-Kit] stop() must be called inside a screen component.');
       }
-      const owner = _currentOverlayComponent || path[path.length - 1];
       const layer = getLayer(owner);
 
       if (options?.focusId) {
@@ -485,9 +488,8 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
   const focusSet = useCallback(
     (focusId: string) => {
-      const path = _currentPath;
-      if (path.length === 0) return;
-      const owner = _currentOverlayComponent || path[path.length - 1];
+      const owner = getCurrentOwner();
+      if (!owner) return;
       const layer = layersRef.current.get(owner);
       if (!layer || !layer.focusTargets.has(focusId)) return;
       if (layer.currentFocusId !== focusId) {
@@ -499,9 +501,8 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   );
 
   const focusNext = useCallback(() => {
-    const path = _currentPath;
-    if (path.length === 0) return;
-    const owner = _currentOverlayComponent || path[path.length - 1];
+    const owner = getCurrentOwner();
+    if (!owner) return;
     const layer = layersRef.current.get(owner);
     if (!layer || layer.focusOrder.length === 0) return;
 
@@ -513,9 +514,8 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   }, []);
 
   const focusPrev = useCallback(() => {
-    const path = _currentPath;
-    if (path.length === 0) return;
-    const owner = _currentOverlayComponent || path[path.length - 1];
+    const owner = getCurrentOwner();
+    if (!owner) return;
     const layer = layersRef.current.get(owner);
     if (!layer || layer.focusOrder.length === 0) return;
 
@@ -527,17 +527,15 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
   }, []);
 
   const focusCurrent = useCallback((): string | null => {
-    const path = _currentPath;
-    if (path.length === 0) return null;
-    const owner = _currentOverlayComponent || path[path.length - 1];
+    const owner = getCurrentOwner();
+    if (!owner) return null;
     const layer = layersRef.current.get(owner);
     return layer?.currentFocusId ?? null;
   }, []);
 
   const focusUnregister = useCallback((focusId: string) => {
-    const path = _currentPath;
-    if (path.length === 0) return;
-    const owner = _currentOverlayComponent || path[path.length - 1];
+    const owner = getCurrentOwner();
+    if (!owner) return;
     const layer = layersRef.current.get(owner);
     if (!layer) return;
 
