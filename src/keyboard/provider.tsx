@@ -249,6 +249,23 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     [],
   );
 
+  const getOrCreateFocusTarget = useCallback(
+    (layer: ScreenKeyboardLayer, focusId: string) => {
+      let target = layer.focusTargets.get(focusId);
+      if (!target) {
+        target = { bindings: [], blockedKeys: [], stoppedKeys: [] };
+        layer.focusTargets.set(focusId, target);
+        layer.focusOrder.push(focusId);
+        if (layer.currentFocusId === null) {
+          layer.currentFocusId = focusId;
+          notifyFocusChange();
+        }
+      }
+      return target;
+    },
+    [],
+  );
+
   /**
    * Bind keys on the current (top-of-stack) screen component.
    *
@@ -273,18 +290,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
 
       if (options?.focusId) {
         const fid = options.focusId;
-        let target = layer.focusTargets.get(fid);
-        if (!target) {
-          target = { bindings: [], blockedKeys: [], stoppedKeys: [] };
-          layer.focusTargets.set(fid, target);
-          layer.focusOrder.push(fid);
-          // 第一个注册的焦点目标自动激活
-          if (layer.currentFocusId === null) {
-            layer.currentFocusId = fid;
-            notifyFocusChange();
-          }
-        }
-
+        const target = getOrCreateFocusTarget(layer, fid);
 
         for (const gk of _globalKeys) {
           const gkKeys = Array.isArray(gk.key) ? gk.key : [gk.key];
@@ -450,17 +456,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       const layer = getLayer(owner);
 
       if (options?.focusId) {
-        // Focus 级 blockedKey
-        let target = layer.focusTargets.get(options.focusId);
-        if (!target) {
-          target = { bindings: [], blockedKeys: [], stoppedKeys: [] };
-          layer.focusTargets.set(options.focusId, target);
-          layer.focusOrder.push(options.focusId);
-          if (layer.currentFocusId === null) {
-            layer.currentFocusId = options.focusId;
-            notifyFocusChange();
-          }
-        }
+        const target = getOrCreateFocusTarget(layer, options.focusId);
         for (const k of keys) {
           if (!target.blockedKeys.includes(k)) {
             target.blockedKeys.push(k);
@@ -495,17 +491,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       const layer = getLayer(owner);
 
       if (options?.focusId) {
-        // Focus 级 stop
-        let target = layer.focusTargets.get(options.focusId);
-        if (!target) {
-          target = { bindings: [], blockedKeys: [], stoppedKeys: [] };
-          layer.focusTargets.set(options.focusId, target);
-          layer.focusOrder.push(options.focusId);
-          if (layer.currentFocusId === null) {
-            layer.currentFocusId = options.focusId;
-            notifyFocusChange();
-          }
-        }
+        const target = getOrCreateFocusTarget(layer, options.focusId);
         const added: string[] = [];
         for (const k of keys) {
           if (!target.stoppedKeys.includes(k)) {
