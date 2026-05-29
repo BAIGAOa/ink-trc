@@ -165,4 +165,8 @@ export interface ShortcutOperationEntry {
    * What does calling a shortcut trigger
    */
   action: () => void;
+  /**
+   * You can directly specify the predetermined Keys of this Action
+   */
+  keys?: string[];
 }

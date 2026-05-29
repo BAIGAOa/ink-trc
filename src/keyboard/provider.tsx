@@ -33,10 +33,11 @@ let _focusSubscribers = new Set<() => void>();
 // 存储快捷操作的集合
 // 在某些场景下为了防止多次重复定义某个操作
 // 以及为了可以JSON配置化，我们就需要这个东西
-let _shortcutOperations = new Map<string, () => void>()
+let _shortcutOperations = new Map<string, { action: () => void; keys?: string[] }>();
 
-export function clearShortcutOperations(){
-  _shortcutOperations.clear()
+
+export function clearShortcutOperations() {
+  _shortcutOperations.clear();
 }
 
 /**
@@ -309,13 +310,13 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
     owner: React.ComponentType<any>,
   ): BoundKeyEntry {
     if (typeof handler === 'string') {
-      const action = _shortcutOperations.get(handler);
-      if (!action) {
+      const entry = _shortcutOperations.get(handler);
+      if (!entry) {
         throw new Error(
           `[Ink-Router-Kit] The shortcut key you used does not exist with ID ${handler}`,
         );
       }
-      return { keys, handler: action, onlyThis, owner };
+      return { keys, handler: entry.action, onlyThis, owner };
     }
     return { keys, handler, onlyThis, owner };
   }
@@ -414,13 +415,37 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
    *
    * The owner is automatically set to the current top-of-stack component.
    * Returns an unbind function for cleanup.
+   *
+   * Overloads:
+   * 1. (keys: string[], handler: KeyHandler | string, options?: BoundKeyboardOptions)
+   * 2. (actionId: string, options: BoundKeyboardOptions) -> uses the action's predefined keys
    */
   const boundKeyboard = useCallback(
     (
-      keys: string[],
-      handler: KeyHandler | string,
-      options?: BoundKeyboardOptions,
+      keysOrActionId: string | string[],
+      handlerOrOptions: KeyHandler | string | BoundKeyboardOptions,
+      maybeOptions?: BoundKeyboardOptions,
     ): (() => void) => {
+
+      if (typeof keysOrActionId === 'string' && typeof handlerOrOptions !== 'function' && typeof handlerOrOptions !== 'string') {
+        const actionId = keysOrActionId;
+        const options = handlerOrOptions as BoundKeyboardOptions;
+        const entry = _shortcutOperations.get(actionId);
+        if (!entry) {
+          throw new Error(`[Ink-Router-Kit] Action "${actionId}" is not registered.`);
+        }
+        if (!entry.keys || entry.keys.length === 0) {
+          throw new Error(`[Ink-Router-Kit] Action "${actionId}" does not have predefined keys. Please register with keys field or call boundKeyboard with explicit keys.`);
+        }
+        // 递归调用原有实现
+        return boundKeyboard(entry.keys, actionId, options);
+      }
+
+      // 原有调用方式
+      const keys = keysOrActionId as string[];
+      const handler = handlerOrOptions as KeyHandler | string;
+      const options = maybeOptions;
+
       const owner = getCurrentOwner();
       if (!owner) {
         throw new Error(
@@ -428,7 +453,6 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         );
       }
       const layer = getLayer(owner);
-
 
       if (options?.focusId) {
         const fid = options.focusId;
@@ -458,10 +482,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
             removeKeysFromActionMap(target!.actionKeysMap, handler, keys);
           }
         };
-
-
       }
-
 
       applyGlobalKeyOverrides(keys, owner, layer, 'boundKeyboard');
 
@@ -488,7 +509,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
       };
     },
-    [getLayer],
+    [getLayer, getOrCreateFocusTarget],
   );
 
   /**
@@ -521,7 +542,7 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
         }
       }
     },
-    [getLayer],
+    [getLayer, getOrCreateFocusTarget],
   );
 
   /**
@@ -677,13 +698,13 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       _globalKeys = []
       for (const each of entries) {
         if (typeof each.operate === 'string') {
-          const action = _shortcutOperations.get(each.operate)
-          if(!action){
+          const entry = _shortcutOperations.get(each.operate)
+          if (!entry) {
             throw new Error(`[Ink-Kit-Router]You want to call the shortcut ${each.operate} in the global key, but it is not registered`)
           }
           _globalKeys.push({
             key: each.key,
-            operate: action,
+            operate: entry.action,
             cover: each.cover,
             category: each.category,
             affectOverlay: each.affectOverlay
@@ -694,10 +715,10 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
             operate: each.operate,
             cover: each.cover,
             category: each.category,
-            affectOverlay: each.affectOverlay 
+            affectOverlay: each.affectOverlay
           })
         }
-    
+
       }
     },
     [],
@@ -708,9 +729,33 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       if (_shortcutOperations.has(each.actionId)) {
         throw new Error(`[Ink-Router-Kit]Duplicate shortcut cannot be defined with ID ${each.actionId}`)
       }
-      _shortcutOperations.set(each.actionId, each.action)
+      // 存储 action 函数和可选的 keys
+      _shortcutOperations.set(each.actionId, {
+        action: each.action,
+        keys: each.keys,
+      })
     }
   }, [])
+
+  /**
+   * Modify the default keys of an existing shortcut action.
+   *
+   * @param actionId - Unique identifier of the action.
+   * @param keys     - New key names to replace the previous default keys.
+   * @throws If the action does not exist or was not registered with a `keys` field.
+   */
+  const modifyAction = useCallback((actionId: string, keys: string[]) => {
+    const entry = _shortcutOperations.get(actionId);
+    if (!entry) {
+      throw new Error(`[Ink-Router-Kit] Cannot modify action "${actionId}": action not registered.`);
+    }
+    // 原注册时没有提供 keys 字段，不允许修改（静默失败原则直接报错）
+    if (entry.keys === undefined) {
+      throw new Error(`[Ink-Router-Kit] Cannot modify action "${actionId}": action was not registered with a 'keys' field.`);
+    }
+    // 直接覆盖
+    entry.keys = keys;
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -724,7 +769,8 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       focusCurrent,
       focusUnregister,
       subscribeFocus,
-      defineShortcutAction
+      defineShortcutAction,
+      modifyAction,
     }),
     [
       boundKeyboard,
@@ -737,7 +783,8 @@ export function KeyboardProvider({ children }: KeyboardProviderProps) {
       focusCurrent,
       focusUnregister,
       subscribeFocus,
-      defineShortcutAction
+      defineShortcutAction,
+      modifyAction,
     ],
   );
 

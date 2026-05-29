@@ -140,6 +140,14 @@ export interface KeyboardContextValue {
 	 * @throws {Error} If an `actionId` is duplicated.
 	 	*/
   defineShortcutAction: (entries: ShortcutOperationEntry[]) => void;
+  /**
+   * Modify the default keys of an existing shortcut action.
+   *
+   * @param actionId - The unique identifier of the action.
+   * @param keys     - New key names to replace the previous default keys.
+   * @throws If the action does not exist or was not registered with a `keys` field.
+   */
+  modifyAction: (actionId: string, keys: string[]) => void;
 }
 
 /**
